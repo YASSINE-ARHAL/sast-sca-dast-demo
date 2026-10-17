@@ -1,0 +1,16 @@
+# Environnements Python
+.venv/
+.venv-sonar/
+**/.venv/
+**/.venv-sonar/
+
+# Fichiers Python temporaires
+__pycache__/
+*.py[cod]
+
+# Résultats d'analyse SonarQube
+.scannerwork/
+**/.scannerwork/
+
+# Rapport DAST généré localement
+vulnerable_flask_app/zap-report.html
