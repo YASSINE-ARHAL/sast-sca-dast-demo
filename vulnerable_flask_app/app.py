@@ -1,52 +1,80 @@
-from flask import Flask, request
+import os
+import secrets
 import subprocess
+from flask import Flask, request, render_template_string
+from markupsafe import escape
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = "verysecretkey123" # Hardcoded secret!
 
-@app.route('/')
+# La clé doit être définie dans l'environnement en production.
+app.config["SECRET_KEY"] = os.environ.get("FLASK_SECRET_KEY") or secrets.token_hex(32)
+
+
+@app.route("/")
 def index():
     return """
-    <h1>Welcome to our vulnerable Flask App! 😎</h1>
-    <p>Explore the different pages:</p>
+    <h1>Welcome to our Flask App</h1>
     <ul>
-        <li><a href="/hello?name=World">Hello Page (try changing the name in the URL!)</a></li>
-        <li><a href="/execute?cmd=ls -la">Execute Command Page (try changing the command in the URL!)</a></li>
-        <li><a href="/admin">Admin Area (contains a secret!)</a></li>
+        <li><a href="/hello?name=World">Hello Page</a></li>
+        <li><a href="/execute?cmd=date">Execute an allowed command</a></li>
+        <li><a href="/admin">Admin Area</a></li>
     </ul>
-    
-    <a href="https://github.com/pandelig/sast-sca-dast-demo" target="_blank">GitHub Repo↗</a></li>
     """
 
-@app.route('/hello')
+
+@app.route("/hello")
 def hello():
-    name = request.args.get('name', 'Guest')
-    return f"""
-    <h1>Hello Page</h1>
-    <p>Hello, {name}!</p>
-    <p><a href="/">Back to Homepage</a></p>
-    """
+    name = request.args.get("name", "Guest")
+    return render_template_string(
+        "<h1>Hello Page</h1><p>Hello, {{ name }}!</p>"
+        '<p><a href="/">Back to Homepage</a></p>',
+        name=name,
+    )
 
-@app.route('/execute')
+
+@app.route("/execute")
 def execute():
-    command = request.args.get('cmd', 'ls -l')
-    # Insecure command execution!
-    result = subprocess.run(command, shell=True, capture_output=True, text=True)
-    return f"""
-    <h1>Execute Command Page</h1>
-    <p>Executing command: <code>{command}</code></p>
-    <pre>{result.stdout}</pre>
-    <pre style="color: red;">{result.stderr}</pre>
-    <p><a href="/">Back to Homepage</a></p>
-    """
+    # Liste blanche : aucune commande fournie librement par l'utilisateur.
+    allowed_commands = {
+        "date": ["date"],
+        "uptime": ["uptime"],
+    }
 
-@app.route('/admin')
+    command_name = request.args.get("cmd", "date")
+    if command_name not in allowed_commands:
+        return "Commande non autorisée.", 400
+
+    try:
+        result = subprocess.run(
+            allowed_commands[command_name],
+            shell=False,
+            capture_output=True,
+            text=True,
+            timeout=5,
+            check=False,
+        )
+    except (subprocess.SubprocessError, OSError):
+        app.logger.exception("Échec de la commande autorisée")
+        return "Impossible d'exécuter la commande.", 500
+
+    return render_template_string(
+        "<h1>Résultat</h1><pre>{{ output }}</pre>"
+        '<p><a href="/">Back to Homepage</a></p>',
+        output=result.stdout if result.returncode == 0 else result.stderr,
+    )
+
+
+@app.route("/admin")
 def admin():
-    return f"""
+    # Cette page de démonstration n'est pas une véritable zone admin.
+    return """
     <h1>Admin Area</h1>
-    <p>Admin area - Secret Key: {app.config['SECRET_KEY']}</p>
+    <p>Aucun secret n'est affiché ici.</p>
+    <p>Attention : une véritable zone d'administration doit exiger une authentification.</p>
     <p><a href="/">Back to Homepage</a></p>
     """
 
-if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0')
+
+if __name__ == "__main__":
+    app.run(debug=False, host="0.0.0.0")
+
