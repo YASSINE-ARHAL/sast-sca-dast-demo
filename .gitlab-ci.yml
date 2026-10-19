@@ -1,7 +1,10 @@
+
 stages:
   - sast
   - sca
+  - dast
 
+# 1. SAST : analyse statique du code Python
 sast:
   stage: sast
   image: python:3.12-slim
@@ -9,9 +12,23 @@ sast:
     - pip install --no-cache-dir bandit
     - bandit -r vulnerable_flask_app -f txt
 
+# 2. SCA : recherche de dépendances vulnérables
 sca:
   stage: sca
   image: python:3.12-slim
   script:
     - pip install --no-cache-dir pip-audit
     - pip-audit -r vulnerable_flask_app/requirements.txt
+
+# 3. DAST : scan dynamique avec OWASP ZAP
+dast:
+  stage: dast
+  image: ghcr.io/zaproxy/zaproxy:stable
+  script:
+    - zap-baseline.py -t "$DAST_TARGET_URL" -r zap-report.html
+  artifacts:
+    when: always
+    paths:
+      - zap-report.html
+    expire_in: 7 days
+
