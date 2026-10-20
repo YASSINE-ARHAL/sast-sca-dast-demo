@@ -7,7 +7,7 @@ stages:
 sast:
   stage: sast
   tags:
-    - docker
+    - docker-executor
   image: python:3.12-slim
   script:
     - pip install --no-cache-dir bandit
@@ -16,7 +16,7 @@ sast:
 sca:
   stage: sca
   tags:
-    - docker
+    - docker-executor
   image: python:3.12-slim
   script:
     - pip install --no-cache-dir pip-audit
@@ -25,7 +25,7 @@ sca:
 dast:
   stage: dast
   tags:
-    - docker
+    - docker-executor
   image: ghcr.io/zaproxy/zaproxy:stable
   script:
     - zap-baseline.py -t "$DAST_TARGET_URL" -r zap-report.html
